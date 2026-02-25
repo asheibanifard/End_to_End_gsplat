@@ -1,0 +1,263 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  NeuroSGM Configuration
+#  3D Gaussian Splatting for Dense Neurite Fluorescence Volumes
+#
+#  Usage:
+#    python train.py --config configs/default.yaml
+#    python train.py --config configs/default.yaml  data.tif=my.tif
+#
+#  All paths are relative to the project root unless absolute.
+#  Inline overrides use dot-notation: section.key=value
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Data
+# ───────────────────────────────────────────────────────────────────────────────
+data:
+  tif: "dataset/10-2900-control-cell-05_cropped_corrected.tif"          # fluorescence volume (.tif / .tiff)
+  swc: "dataset/10-2900-control-cell-05_cropped_corrected.swc"     # morphology skeleton (.swc)
+
+  # Physical voxel size in the same units as SWC coordinates (usually µm).
+  # Set to null to auto-scale SWC bounding box into the voxel grid.
+  voxel_size: null                        # [dz, dy, dx]  e.g. [0.3, 0.1, 0.1]
+
+  # Normalise voxel intensity to [0, 1] before processing
+  normalise_volume: true
+
+  # Channel handling for multi-channel TIFs:
+  #   "max"   — max across channels → single-channel volume
+  #   "mean"  — mean across channels
+  #   "keep"  — keep all channels (feature_dim must match)
+  channel_mode: "max"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Gaussian Initialisation
+# ───────────────────────────────────────────────────────────────────────────────
+init:
+  # ── Voxel seed extraction ──────────────────────────────────────────────────
+  seed_strategy: "threshold"             # "threshold" | "topk" | "grid"
+  seed_threshold: 0.10                   # intensity floor (threshold strategy)
+  max_seeds: 200000                      # hard cap on voxel-derived Gaussians
+  grid_stride: 4                         # voxel stride (grid strategy only)
+
+  # ── SWC initialisation ────────────────────────────────────────────────────
+  swc_opacity_init: 1.0                  # logit-opacity boost for SWC Gaussians
+  swc_scale_from_radius: true            # use morphological radius → log_scale
+  swc_radius_multiplier: 1.0            # scale SWC radii by this factor
+
+  # ── Per-Gaussian feature vector ───────────────────────────────────────────
+  feature_dim: 3                         # 3 = RGB-like; 1 = single-intensity
+  feature_init_std: 0.01                 # std of random feature initialisation
+
+  # ── Scale initialisation fallback (when not using SWC radius) ─────────────
+  default_log_scale: -5.0                # exp(-5) ≈ 0.007 in normalised coords
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Rendering
+# ───────────────────────────────────────────────────────────────────────────────
+render:
+  H: 512                                 # output image height (pixels)
+  W: 512                                 # output image width  (pixels)
+  fov_deg: 60.0                          # horizontal field of view (degrees)
+  znear: 0.01                            # near clipping plane
+  zfar:  10.0                            # far  clipping plane
+
+  # Soft-MIP temperature β: higher → sharper max-like projection
+  # Lower (e.g. 5) → softer average-like; higher (e.g. 20) → hard max approx
+  soft_mip_beta: 10.0
+
+  # 3-sigma culling threshold for per-pixel Mahalanobis distance
+  maha_threshold: 9.0
+
+  # Low-pass anti-aliasing added to 2D covariance diagonal (EWA filter)
+  low_pass_filter: 0.3
+
+  # Camera orbit schedule during training:
+  #   "orbit"   — full azimuth orbit with elevation wobble  (default)
+  #   "random"  — random viewpoints on a sphere
+  #   "fixed"   — fixed top-down XY view only (fastest, less view diversity)
+  camera_schedule: "orbit"
+  orbit_radius: 2.5                      # camera distance from volume centre
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Optimisation
+# ───────────────────────────────────────────────────────────────────────────────
+optim:
+  iterations: 30000
+
+  # Per-parameter-group learning rates  (Adam)
+  lr:
+    means:    1.6e-4                     # Gaussian positions
+    quats:    1.0e-3                     # orientations (quaternions)
+    scales:   5.0e-3                     # log-scales
+    opacity:  5.0e-2                     # logit-opacities
+    features: 2.5e-3                     # per-Gaussian features
+
+  # Exponential LR decay: lr(t) = lr_0 · decay^(t / iterations)
+  # decay=0.01 → 100× reduction over full training
+  lr_decay: 0.01
+
+  # Adam hyperparameters
+  adam_eps: 1.0e-15
+  adam_betas: [0.9, 0.999]
+
+  # Gradient clipping (max L2 norm across all parameters)
+  grad_clip_norm: 1.0
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Adaptive Density Control  (ADC)
+# ───────────────────────────────────────────────────────────────────────────────
+adc:
+  # Densification window: only run ADC between these iterations
+  densify_from:  500
+  densify_until: 15000
+  densify_interval: 100                  # iterations between ADC steps
+
+  # Gradient threshold: Gaussians with mean view-space ∇ > this get cloned/split
+  grad_threshold: 2.0e-4
+
+  # Opacity threshold: Gaussians below this are pruned
+  opacity_prune: 0.005
+
+  # Screen-space size threshold: Gaussians larger than this fraction of image
+  # width get split rather than cloned
+  max_screen_size: 0.05
+
+  # Periodic opacity reset to prevent opacity saturation
+  opacity_reset_interval: 3000
+
+  # Hard cap on total Gaussians (stops runaway densification)
+  max_gaussians: 1000000
+
+  # Minimum Gaussians (below this, skip pruning)
+  min_gaussians: 1000
+
+  # Cloning / splitting noise scale (fraction of Gaussian extent)
+  clone_noise_scale: 0.1
+  split_scale_shrink: 1.6                # split children are 1/1.6 the parent scale
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Loss Function
+# ───────────────────────────────────────────────────────────────────────────────
+loss:
+  # ── Photometric: L1 + D-SSIM  ────────────────────────────────────────────
+  photometric:
+    weight: 1.0
+    lambda_dssim: 0.2                    # blend: (1-λ)·L1 + λ·(1-SSIM)
+    ssim_window: 11                      # SSIM Gaussian kernel size
+
+  # ── Volume MIP consistency  ───────────────────────────────────────────────
+  mip_consistency:
+    weight: 0.5
+    anneal_until: 3000                   # linearly decay to 0 by this iteration
+    axes: ["xy"]                         # which projections to supervise: xy/xz/yz
+
+  # ── Opacity sparsity  ─────────────────────────────────────────────────────
+  opacity_sparsity:
+    weight: 0.05
+    entropy_weight: 0.1                  # scale of entropy term
+    target_mean_opacity: 0.10            # mean opacity penalty threshold
+
+  # ── Scale regularisation  ─────────────────────────────────────────────────
+  scale_reg:
+    weight: 0.01
+    min_log_scale: -8.0                  # soft lower bound on log(scale)
+    max_log_scale: -2.0                  # soft upper bound on log(scale)
+
+  # ── Depth smoothness (total variation)  ──────────────────────────────────
+  depth_smooth:
+    weight: 0.005
+
+  # ── Feature smoothness (kNN in position space)  ───────────────────────────
+  feature_smooth:
+    weight: 0.001
+    k_neighbors: 4
+    subsample: 4000                      # max Gaussians to subsample per iter
+    apply_every: 10                      # compute only every N iterations
+
+  # ── SWC proximity anchor  ─────────────────────────────────────────────────
+  swc_proximity:
+    weight: 0.01
+    k_nearest: 3                         # nearest SWC nodes to measure distance to
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  CUDA Extension
+# ───────────────────────────────────────────────────────────────────────────────
+cuda:
+  # Use compiled CUDA extension for forward/backward (strongly recommended)
+  use_extension: true
+
+  # Fallback to pure-PyTorch renderer if extension unavailable
+  pytorch_fallback: true
+
+  # CUDA arch list for compilation (passed to TORCH_CUDA_ARCH_LIST)
+  arch_list: "7.0;7.5;8.0;8.6;8.9;9.0"
+
+  # Thread block sizes
+  block_size_1d: 256                     # 1D kernels (per-Gaussian)
+  block_size_2d: [16, 16]               # 2D kernels (per-pixel)
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Logging & Checkpointing
+# ───────────────────────────────────────────────────────────────────────────────
+logging:
+  out_dir: "outputs/run_01"
+
+  log_interval:   100                    # console print + TensorBoard every N iters
+  save_interval:  5000                   # save .pt checkpoint every N iters
+  render_interval: 1000                  # save render image every N iters
+
+  # Which loss terms to log individually to TensorBoard
+  log_loss_terms: true
+
+  # Log Gaussian statistics (N, mean opacity, mean scale)
+  log_gaussian_stats: true
+
+  # TensorBoard
+  tensorboard: true
+  tb_subdir: "tb"
+
+  # Weights & Biases (optional)
+  wandb:
+    enabled: false
+    project: "neuro3dgs"
+    entity:  null                        # set to your W&B username
+    run_name: null                       # null = auto-generated
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Visualisation  (visualise.py)
+# ───────────────────────────────────────────────────────────────────────────────
+vis:
+  H: 512
+  W: 512
+  fov_deg: 60.0
+
+  # Gallery render (post-training orbit)
+  gallery_views: 36                      # number of orbit frames
+  gallery_subdir: "gallery"
+
+  # PLY export
+  export_ply: true
+  ply_filename: "gaussians.ply"
+
+  # MIP trio (XY / XZ / YZ projections)
+  render_mip_trio: true
+
+  # Interactive matplotlib orbit
+  orbit_animation: false
+  orbit_frames: 72
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+#  Reproducibility
+# ───────────────────────────────────────────────────────────────────────────────
+seed: 42
+deterministic: false                     # true = slower but fully reproducible
