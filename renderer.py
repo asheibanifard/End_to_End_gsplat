@@ -208,7 +208,7 @@ def render(
 def _mip_splat_pytorch(
     means3d, cov3d, opacity, features, view_mat_flat,
     H, W, fx, fy, cx, cy,
-    soft_beta: float = 10.0,
+    soft_beta: float = 0.01,  # Reduced from 0.5 to avoid numerical overflow
 ):
     """
     Differentiable soft-MIP splatting in pure PyTorch.
@@ -262,18 +262,22 @@ def _mip_splat_pytorch(
         c * du**2 - 2.0 * b * du * dv + a * dv**2
     ) * inv_det.unsqueeze(0).unsqueeze(0)   # [H,W,N]
 
-    alpha = torch.exp(-0.5 * maha) * opacity.view(1, 1, N)  # [H,W,N]
-    alpha = alpha * valid.float().unsqueeze(0).unsqueeze(0)
-
-    # Soft-MIP weight: emphasise near/high-depth Gaussians
-    depth_w = torch.exp(soft_beta * (-zc)).unsqueeze(0).unsqueeze(0)  # [H,W,N]
-    w = alpha * depth_w   # [H,W,N]
-
-    denom = w.sum(dim=-1, keepdim=True).clamp(min=1e-10)  # [H,W,1]
-
-    # Weighted sum over Gaussians → rendered image
-    image = (w.unsqueeze(-1) * features.unsqueeze(0).unsqueeze(0)).sum(dim=2) / denom
-    depth_img  = (w * zc.unsqueeze(0).unsqueeze(0)).sum(dim=-1) / denom.squeeze(-1)
-    weight_img = alpha.sum(dim=-1)
+    footprint = torch.exp(-0.5 * maha) * valid.float().unsqueeze(0).unsqueeze(0)  # [H,W,N]
+    
+    # Emission strength per Gaussian: footprint × mean intensity
+    mean_intensity = features.mean(dim=-1, keepdim=True)  # [N,1]
+    emission = footprint * mean_intensity.view(1, 1, N)  # [H,W,N]
+    
+    # Soft-max weights: emphasize higher emissions (true MIP, no depth bias)
+    soft_w = torch.exp(soft_beta * emission)  # [H,W,N]
+    soft_w_sum = soft_w.sum(dim=-1, keepdim=True).clamp(min=1e-10)  # [H,W,1]
+    
+    # Soft-max weighted intensity per channel
+    soft_max_num = (soft_w.unsqueeze(-1) * features.unsqueeze(0).unsqueeze(0))  # [H,W,N,C]
+    image = soft_max_num.sum(dim=2) / soft_w_sum  # [H,W,C]
+    
+    # Depth weighted by soft-max weights
+    depth_img  = (soft_w * zc.unsqueeze(0).unsqueeze(0)).sum(dim=-1) / soft_w_sum.squeeze(-1)
+    weight_img = emission.sum(dim=-1)
 
     return image, weight_img, depth_img

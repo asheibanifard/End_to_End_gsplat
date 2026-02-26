@@ -1,0 +1,8 @@
+README.md
+mip_splat_kernel.cu
+setup.py
+setup_mip_splatting.py
+mip_splatting_cuda.egg-info/PKG-INFO
+mip_splatting_cuda.egg-info/SOURCES.txt
+mip_splatting_cuda.egg-info/dependency_links.txt
+mip_splatting_cuda.egg-info/top_level.txt

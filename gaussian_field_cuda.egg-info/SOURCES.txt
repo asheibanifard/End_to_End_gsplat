@@ -1,0 +1,8 @@
+README.md
+gaussian_field_cuda.cu
+setup.py
+setup_gaussian_field.py
+gaussian_field_cuda.egg-info/PKG-INFO
+gaussian_field_cuda.egg-info/SOURCES.txt
+gaussian_field_cuda.egg-info/dependency_links.txt
+gaussian_field_cuda.egg-info/top_level.txt

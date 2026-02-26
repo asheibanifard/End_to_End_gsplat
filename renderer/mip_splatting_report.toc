@@ -1,0 +1,56 @@
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Problem Statement}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Our Approach}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Pipeline Overview}{2}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Mathematical Formulation}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Gaussian Mixture Field Representation}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}MIP Splatting: Rendering Equation}{3}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Step 1: World-to-Camera Transform}{3}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}Step 2: Perspective Projection (EWA Splatting)}{3}{subsubsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.3}Step 3: 2D Gaussian Evaluation}{3}{subsubsection.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.4}Step 4: Differentiable Soft-MIP Aggregation}{3}{subsubsection.2.2.4}%
+\contentsline {section}{\numberline {3}Implementation Details}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Volume Preprocessing}{3}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}Data Format}{3}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.2}Aspect Ratio Correction}{3}{subsubsection.3.1.2}%
+\contentsline {subsection}{\numberline {3.2}Configuration Parameters}{4}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Stage 1: Ground Truth MIP Generation}{4}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Multi-View Camera Pose Generation}{4}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Volumetric Ray Marching}{4}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Dataset Statistics}{5}{subsection.4.3}%
+\contentsline {section}{\numberline {5}Stage 2: Gaussian Mixture Field Initialization}{5}{section.5}%
+\contentsline {subsection}{\numberline {5.1}GMF Fitting Process}{5}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Initial Gaussian Statistics}{5}{subsection.5.2}%
+\contentsline {section}{\numberline {6}Stage 3: MIP Splatting Training}{5}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Training Objective}{5}{subsection.6.1}%
+\contentsline {subsubsection}{\numberline {6.1.1}Weighted Mean Squared Error (WMSE)}{5}{subsubsection.6.1.1}%
+\contentsline {subsubsection}{\numberline {6.1.2}Structural Similarity Index (SSIM)}{6}{subsubsection.6.1.2}%
+\contentsline {subsubsection}{\numberline {6.1.3}Edge Loss (Optional)}{6}{subsubsection.6.1.3}%
+\contentsline {subsubsection}{\numberline {6.1.4}Intensity Distribution Loss (Optional)}{6}{subsubsection.6.1.4}%
+\contentsline {subsubsection}{\numberline {6.1.5}Scale Regularization}{6}{subsubsection.6.1.5}%
+\contentsline {subsection}{\numberline {6.2}Complete Loss Function}{6}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Optimization Schedule}{6}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Adaptive Density Control}{6}{subsection.6.4}%
+\contentsline {section}{\numberline {7}Ablation Study: Loss Function Comparison}{7}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Training Results}{7}{subsection.7.1}%
+\contentsline {section}{\numberline {8}Experimental Evaluation}{7}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Experiment 1: Rendering Performance Benchmark}{7}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Experiment 2: Visual Quality Assessment}{8}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Experiment 3: Scalability Analysis}{8}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Experiment 4: Multi-View Orbit Rendering}{9}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Experiment 5: Soft-MIP Convergence Analysis}{9}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}Experiment 6: Memory Efficiency}{9}{subsection.8.6}%
+\contentsline {section}{\numberline {9}Implementation Architecture}{10}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Software Stack}{10}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Core Classes}{10}{subsection.9.2}%
+\contentsline {subsubsection}{\numberline {9.2.1}GaussianParameters}{10}{subsubsection.9.2.1}%
+\contentsline {subsubsection}{\numberline {9.2.2}Camera}{10}{subsubsection.9.2.2}%
+\contentsline {subsubsection}{\numberline {9.2.3}MIPSplattingTrainer}{10}{subsubsection.9.2.3}%
+\contentsline {subsection}{\numberline {9.3}CUDA Kernel: Online Soft-Max Splatting}{10}{subsection.9.3}%
+\contentsline {section}{\numberline {10}Results Summary and Discussion}{11}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Key Achievements}{11}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Limitations and Future Work}{11}{subsection.10.2}%
+\contentsline {subsubsection}{\numberline {10.2.1}Current Limitations}{11}{subsubsection.10.2.1}%
+\contentsline {subsubsection}{\numberline {10.2.2}Future Directions}{11}{subsubsection.10.2.2}%
+\contentsline {subsection}{\numberline {10.3}Comparison with Related Methods}{11}{subsection.10.3}%
+\contentsline {section}{\numberline {11}Conclusion}{12}{section.11}%

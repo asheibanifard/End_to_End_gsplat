@@ -1,0 +1,8 @@
+README.md
+gaussian_splatting_cuda.cu
+setup.py
+setup_splatting.py
+gaussian_splatting_cuda.egg-info/PKG-INFO
+gaussian_splatting_cuda.egg-info/SOURCES.txt
+gaussian_splatting_cuda.egg-info/dependency_links.txt
+gaussian_splatting_cuda.egg-info/top_level.txt

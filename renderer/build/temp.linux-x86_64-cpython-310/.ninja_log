@@ -1,0 +1,3 @@
+# ninja log v7
+0	67460	1771711341441963960	/workspace/hisnegs/src/renderer/build/temp.linux-x86_64-cpython-310/splat_cuda.o	55b5cadacaef39c9
+7	66792	1771711409358057666	/workspace/hisnegs/src/renderer/build/temp.linux-x86_64-cpython-310/splat_mip_cuda.o	4241d4851989e3b5

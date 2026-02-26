@@ -16,7 +16,7 @@ namespace cg = cooperative_groups;
 
 #define BLOCK_SIZE 256
 #define MAX_GAUSSIANS_PER_PIXEL 64
-#define SOFT_MIP_BETA 10.0f  // sharpness of soft-max approximation
+#define SOFT_MIP_BETA 2.0f  // sharpness of soft-max approximation (for intensity-based MIP)
 
 // ============================================================
 //  Helper: project 3D Gaussian centre to 2D + compute 2D cov
