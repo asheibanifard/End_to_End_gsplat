@@ -49,8 +49,9 @@ class MIPSplattingFunction(Function):
         view_mat_flat = view_matrix.reshape(-1).contiguous()
         
         if CUDA_AVAILABLE and means_3d.is_cuda:
-            # Call CUDA kernel
-            img, weight, depth = mip_splatting_cuda.mip_splat_forward(
+            # CUDA kernel returns 4 tensors: img, weight, depth, sum_sw
+            # sum_sw = Σ(soft_w) per pixel — required by backward for correct gradients
+            img, weight, depth, sum_sw = mip_splatting_cuda.mip_splat_forward(
                 means_3d.contiguous(),
                 cov_3d.contiguous(),
                 opacity.contiguous(),
@@ -59,13 +60,15 @@ class MIPSplattingFunction(Function):
                 H, W, float(fx), float(fy), float(cx), float(cy)
             )
         else:
-            # Fallback: simple PyTorch implementation (slow, for debugging)
+            # Fallback: PyTorch implementation (slow, for debugging)
             img, weight, depth = _mip_splat_forward_pytorch(
                 means_3d, cov_3d, features, view_matrix, fx, fy, cx, cy, H, W
             )
+            # CPU fallback cannot compute exact sum_sw; gradients will be approximate
+            sum_sw = torch.zeros(H, W, device=means_3d.device)
         
-        # Save for backward
-        ctx.save_for_backward(means_3d, cov_3d, opacity, features, view_mat_flat, img, weight, depth)
+        # Save for backward — sum_sw is essential for correct gradient computation
+        ctx.save_for_backward(means_3d, cov_3d, opacity, features, view_mat_flat, img, weight, depth, sum_sw)
         ctx.H = H
         ctx.W = W
         ctx.fx = fx
@@ -80,19 +83,19 @@ class MIPSplattingFunction(Function):
         """
         Compute gradients w.r.t. inputs.
         """
-        means_3d, cov_3d, opacity, features, view_mat_flat, img, weight, depth = ctx.saved_tensors
+        means_3d, cov_3d, opacity, features, view_mat_flat, img, weight, depth, sum_sw = ctx.saved_tensors
         H, W = ctx.H, ctx.W
         fx, fy, cx, cy = ctx.fx, ctx.fy, ctx.cx, ctx.cy
         
-        dL_dimg = dL_dimg.contiguous()
+        dL_dimg    = dL_dimg.contiguous()
         dL_dweight = dL_dweight.contiguous() if dL_dweight is not None else torch.zeros_like(weight)
-        dL_ddepth = dL_ddepth.contiguous() if dL_ddepth is not None else torch.zeros_like(depth)
+        dL_ddepth  = dL_ddepth.contiguous() if dL_ddepth is not None else torch.zeros_like(depth)
         
         if CUDA_AVAILABLE and means_3d.is_cuda:
-            # Call CUDA backward kernel
+            # Pass sum_sw so the backward kernel can use the exact Σ(soft_w) per pixel
             dL_dmeans, dL_dcov, dL_dopacity, dL_dfeatures = mip_splatting_cuda.mip_splat_backward(
                 means_3d, cov_3d, opacity, features, view_mat_flat,
-                img, weight, depth,
+                img, weight, depth, sum_sw,
                 dL_dimg, dL_dweight, dL_ddepth,
                 H, W, float(fx), float(fy), float(cx), float(cy)
             )
@@ -109,43 +112,45 @@ class MIPSplattingFunction(Function):
 def _mip_splat_forward_pytorch(means_3d, cov_3d, features, view_matrix, fx, fy, cx, cy, H, W):
     """
     PyTorch fallback implementation of MIP splatting (slow, for debugging).
+    Applies the full 4x4 view matrix so CPU debugging matches CUDA behaviour.
     """
     N = means_3d.shape[0]
     C = features.shape[1]
     device = means_3d.device
-    
-    img = torch.zeros(H, W, C, device=device)
+
+    img    = torch.zeros(H, W, C, device=device)
     weight = torch.zeros(H, W, device=device)
-    depth = torch.zeros(H, W, device=device)
-    
-    # For each Gaussian, splat to all pixels (very slow!)
+    depth  = torch.zeros(H, W, device=device)
+
+    # Pre-extract 3x4 view submatrix (top three rows of 4x4 view_matrix)
+    R = view_matrix[:3, :3]  # (3, 3)
+    t = view_matrix[:3,  3]  # (3,)
+
     for g in range(N):
         mean = means_3d[g]  # (3,)
-        
-        # Transform to camera space (simplified - assumes view_matrix is identity for now)
-        mean_cam = mean
-        
+
+        # Apply view transform: p_cam = R @ mean + t
+        mean_cam = R @ mean + t  # (3,)
+
         if mean_cam[2] <= 0.01:
             continue
-        
-        # Project to 2D
+
+        # Perspective projection
         u = (mean_cam[0] / mean_cam[2]) * fx + cx
         v = (mean_cam[1] / mean_cam[2]) * fy + cy
-        
+
         if u < 0 or u >= W or v < 0 or v >= H:
             continue
-        
-        # Simplified: just splat intensity to nearest pixel
+
         px = int(u)
         py = int(v)
-        
+
         if 0 <= px < W and 0 <= py < H:
-            # Use max (MIP) instead of sum
-            for c in range(C):
-                img[py, px, c] = torch.max(img[py, px, c], features[g, c])
+            for ch in range(C):
+                img[py, px, ch] = torch.max(img[py, px, ch], features[g, ch])
             weight[py, px] += 1.0
-            depth[py, px] = mean_cam[2]
-    
+            depth[py, px]   = mean_cam[2]
+
     return img, weight, depth
 
 
@@ -195,19 +200,25 @@ def mip_splat_render(means_3d, cov_tril_params, features, view_matrix, fx, fy, c
         view_matrix: (4, 4) - Camera view matrix
         fx, fy, cx, cy: Camera intrinsics
         H, W: Image dimensions
-    
+
     Returns:
-        rendered_image: (H, W, C) - MIP projection
+        img:    (H, W, C) - Soft-MIP projection  [differentiable]
+        weight: (H, W)    - Σ(emission_strength) [diagnostic only, no gradient]
+        depth:  (H, W)    - Weighted mean depth   [diagnostic only, no gradient]
+
+    Note: only `img` participates in autograd. `weight` and `depth` are saved
+    context tensors returned for visualisation / debugging. If you need depth
+    gradients, add a dedicated depth-loss term inside MIPSplattingFunction.
     """
-    # Build 3D covariances
+    # Build 3D covariances from Cholesky params (differentiable)
     cov_3d = build_covariance_from_cholesky(cov_tril_params)
-    
-    # Call autograd function
+
+    # Run differentiable forward (weight and depth are ctx tensors, not autograd outputs)
     img, weight, depth = MIPSplattingFunction.apply(
         means_3d, cov_3d, features, view_matrix,
         fx, fy, cx, cy, H, W
     )
-    
+
     return img, weight, depth
 
 

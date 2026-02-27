@@ -1,9 +1,2 @@
 # ninja log v7
-0	194782	1772010467621558006	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/mip_splat_kernel.o	d90d735c27b6bd0f
-7	190791	1772032221502005744	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_field_cuda.o	d10359c4c87fe7da
-34	183803	1772032744714691780	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_field_cuda.o	d10359c4c87fe7da
-31	188647	1772035397745913285	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_field_cuda.o	d10359c4c87fe7da
-7	136719	1772039871551649270	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_splatting_cuda.o	7f9baa1f878aa1b1
-38	140668	1772040802960831652	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_splatting_cuda.o	7f9baa1f878aa1b1
-33	135356	1772040959341029930	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/gaussian_splatting_cuda.o	7f9baa1f878aa1b1
-47	148244	1772041912462310037	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/mip_splat_kernel.o	fbc61a5fe1eb267
+1	144313	1772116949710049986	/workspace/end_to_end/build/temp.linux-x86_64-cpython-310/mip_splat_kernel.o	fbc61a5fe1eb267
